@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIC — Logística Rugby</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a1a;min-height:100vh}
+
+header{background:#0d0d0d;padding:16px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.hbar{width:4px;height:26px;background:#0099cc;border-radius:2px}
+header h1{color:#fff;font-size:17px;font-weight:600;letter-spacing:-0.3px}
+header p{color:rgba(255,255,255,0.4);font-size:11px;margin-top:1px}
+
+.day-tabs{background:#0d0d0d;padding:0 16px 14px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.day-tabs::-webkit-scrollbar{display:none}
+.day-tab{padding:6px 14px;border-radius:20px;border:1.5px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;background:transparent;transition:all 0.15s}
+.day-tab.active{background:#0099cc;border-color:#0099cc;color:#fff}
+
+.content{padding:16px;max-width:480px;margin:0 auto}
+
+.activity-card{background:#fff;border-radius:14px;margin-bottom:12px;overflow:hidden;border:0.5px solid #e5e5e5}
+.activity-card.cancelado{opacity:0.55}
+
+.card-top{padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.card-left{}
+.card-time{font-size:26px;font-weight:800;color:#0d0d0d;letter-spacing:-1px;line-height:1}
+.card-division{font-size:15px;font-weight:700;color:#0099cc;margin-top:4px}
+.card-loc{font-size:12px;color:#888;margin-top:3px}
+.card-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
+
+.badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+.b-entreno{background:#f0f0f0;color:#555}
+.b-partido{background:#e3f4fc;color:#0077aa}
+.b-torneo{background:#e8f5e9;color:#2e7d32}
+.b-canch{background:#fff3e0;color:#d84315}
+.b-mod{background:#fff3e0;color:#e65100}
+.b-cancel{background:#ffebee;color:#c62828}
+.b-libre{background:#f3e5f5;color:#7b1fa2}
+
+.divider{height:0.5px;background:#f0f0f0;margin:0 16px}
+
+.card-mats{padding:12px 16px}
+.section-label{font-size:10px;font-weight:700;color:#aaa;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px}
+.mats-wrap{display:flex;flex-wrap:wrap;gap:6px}
+.mat-chip{background:#f7f8fa;border-radius:8px;padding:5px 10px;font-size:12px;color:#333;display:flex;align-items:center;gap:4px}
+.mat-chip.especial{background:#fffde7;border:1px solid #ffe57f}
+.mat-qty{font-weight:800;color:#0d0d0d;font-size:13px}
+
+.card-staff{padding:10px 16px 14px;display:flex;gap:16px}
+.staff-col{flex:1;min-width:0}
+.staff-label{font-size:10px;font-weight:700;color:#aaa;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px}
+.staff-name{font-size:13px;font-weight:600;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.staff-tel{font-size:11px;color:#0099cc;margin-top:1px}
+
+.card-comment{padding:8px 16px 12px}
+.comment-box{font-size:12px;color:#666;font-style:italic;padding:8px 12px;background:#fffde7;border-left:3px solid #ffc107;border-radius:0 6px 6px 0;line-height:1.5}
+
+.loading{text-align:center;padding:60px 20px}
+.spin{width:32px;height:32px;border:3px solid #e0e0e0;border-top:3px solid #0099cc;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading p{color:#999;font-size:14px}
+
+.empty{text-align:center;padding:60px 20px}
+.empty h3{font-size:15px;color:#999;font-weight:500;margin-top:12px}
+
+.error-box{background:#ffebee;border-radius:12px;padding:20px;margin:16px;text-align:center}
+.error-box h3{color:#c62828;font-size:14px;margin-bottom:6px}
+.error-box p{color:#c62828;font-size:12px;opacity:0.8}
+
+.last-update{text-align:center;color:#bbb;font-size:11px;padding:8px 0 24px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hbar"></div>
+  <div>
+    <h1>SIC — Logística</h1>
+    <p id="semanaLabel">Cargando...</p>
+  </div>
+</header>
+
+<div class="day-tabs" id="dayTabs"></div>
+
+<div class="content" id="content">
+  <div class="loading">
+    <div class="spin"></div>
+    <p>Cargando semana activa...</p>
+  </div>
+</div>
+
+<script>
+const SHEET_ID = '1Tln0RwNCTfUNwwQKKpHSeiVBvJvobhUCzDEJwYPKz7E';
+const GID_ACTIVA = '806139269';
+const URL_CSV = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/pub?gid=${GID_ACTIVA}&single=true&output=csv`;
+
+const DIAS_ORDER = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+let allData = [];
+let currentDay = '';
+
+function parseCSV(text) {
+  const rows = [];
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    const cells = []; let cell = '', inQ = false;
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cells.push(cell.trim()); cell = ''; }
+      else { cell += ch; }
+    }
+    cells.push(cell.trim());
+    rows.push(cells);
+  }
+  return rows;
+}
+
+function fmtTime(t) {
+  if (!t) return '';
+  const pm = /p\.?m/i.test(t), am = /a\.?m/i.test(t);
+  const m = t.match(/(\d+):(\d+)/);
+  if (!m) return t;
+  let h = parseInt(m[1]), min = m[2];
+  if (pm && h < 12) h += 12;
+  if (am && h === 12) h = 0;
+  return `${String(h).padStart(2,'0')}:${min}`;
+}
+
+function getTodayDia() {
+  return ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][new Date().getDay()];
+}
+
+async function loadData() {
+  try {
+    const res = await fetch(URL_CSV);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const rows = parseCSV(text);
+
+    let hi = rows.findIndex(r => r[0] === 'Día');
+    if (hi < 0) hi = 0;
+
+    allData = rows.slice(hi + 1)
+      .filter(r => r[4] && r[4].trim() && DIAS_ORDER.includes(r[0]?.trim()))
+      .map(r => ({
+        dia: r[0]?.trim() || '',
+        sede: r[1]?.trim() || '',
+        cancha: r[2]?.trim() || '',
+        horario: fmtTime(r[3]?.trim() || ''),
+        division: r[4]?.trim() || '',
+        tipo: r[5]?.trim() || '',
+        canchitas: r[6]?.trim() || '',
+        nPelota: r[7]?.trim() || '',
+        cantPelotas: r[8]?.trim() || '',
+        pecheras: r[9]?.trim() || '',
+        conos: r[10]?.trim() || '',
+        escudos: r[11]?.trim() || '',
+        bolsas: r[12]?.trim() || '',
+        varas: r[13]?.trim() || '',
+        colchones: r[14]?.trim() || '',
+        matEsp: r[15]?.trim() || '',
+        medico: r[16]?.trim() || '',
+        telMedico: r[17]?.trim() || '',
+        arbitro: r[18]?.trim() || '',
+        telArbitro: r[19]?.trim() || '',
+        comentarios: r[20]?.trim() || '',
+        estado: r[21]?.trim() || 'Normal',
+      }));
+
+    const diasConData = DIAS_ORDER.filter(d => allData.some(a => a.dia === d));
+    const today = getTodayDia();
+    currentDay = diasConData.includes(today) ? today : (diasConData[0] || '');
+
+    document.getElementById('semanaLabel').textContent = 'Semana activa · ' + new Date().toLocaleDateString('es-AR', {day:'numeric',month:'long'});
+    renderTabs(diasConData);
+    renderContent();
+  } catch(e) {
+    document.getElementById('content').innerHTML = `
+      <div class="error-box">
+        <h3>No se pudo cargar la información</h3>
+        <p>Verificá que el Sheets esté publicado y reintentá.</p>
+        <p style="margin-top:6px;font-size:10px;opacity:0.6">${e.message}</p>
+      </div>`;
+    document.getElementById('semanaLabel').textContent = 'Error de conexión';
+  }
+}
+
+function renderTabs(dias) {
+  document.getElementById('dayTabs').innerHTML = dias.map(d =>
+    `<button class="day-tab ${d===currentDay?'active':''}" onclick="selectDay('${d}')">${d.substring(0,3)}</button>`
+  ).join('');
+}
+
+function selectDay(day) {
+  currentDay = day;
+  document.querySelectorAll('.day-tab').forEach(t =>
+    t.classList.toggle('active', t.textContent === day.substring(0,3))
+  );
+  renderContent();
+}
+
+function matOk(v) { return v && v !== '0' && v !== ''; }
+
+function renderCard(a) {
+  const tipo = (a.tipo || 'Entreno').toLowerCase();
+  const tipoBadge = tipo === 'partido' ? 'b-partido' : tipo === 'torneo' ? 'b-torneo' : 'b-entreno';
+  const estadoClass = {Modificado:'b-mod',Cancelado:'b-cancel',Libre:'b-libre'}[a.estado] || '';
+  const showCanchitas = a.canchitas && a.canchitas !== 'Cancha completa' && a.canchitas !== '0';
+
+  const mats = [];
+  if (matOk(a.cantPelotas)) mats.push({qty: a.cantPelotas, label: `Pelotas ${a.nPelota}`});
+  if (matOk(a.pecheras))    mats.push({qty: a.pecheras, label: 'Pecheras'});
+  if (matOk(a.conos))       mats.push({qty: a.conos==='✓'?'':a.conos, label: 'Conos'});
+  if (matOk(a.escudos))     mats.push({qty: a.escudos, label: 'Escudos'});
+  if (matOk(a.bolsas))      mats.push({qty: a.bolsas, label: 'Bolsas tackle'});
+  if (matOk(a.varas))       mats.push({qty: a.varas==='✓'?'':a.varas, label: 'Varas evasión'});
+  if (matOk(a.colchones))   mats.push({qty: a.colchones, label: 'Colchones'});
+  if (a.matEsp)              mats.push({qty:'', label: a.matEsp, especial: true});
+
+  const matsHTML = mats.length ? `
+    <div class="divider"></div>
+    <div class="card-mats">
+      <div class="section-label">Materiales</div>
+      <div class="mats-wrap">
+        ${mats.map(m=>`<div class="mat-chip${m.especial?' especial':''}">
+          ${m.qty?`<span class="mat-qty">${m.qty}</span>`:''}
+          <span>${m.label}</span>
+        </div>`).join('')}
+      </div>
+    </div>` : '';
+
+  const staffHTML = (a.medico || a.arbitro) ? `
+    <div class="divider"></div>
+    <div class="card-staff">
+      ${a.medico ? `<div class="staff-col">
+        <div class="staff-label">Médico</div>
+        <div class="staff-name">${a.medico}</div>
+        ${a.telMedico?`<div class="staff-tel">${a.telMedico}</div>`:''}
+      </div>` : ''}
+      ${a.arbitro ? `<div class="staff-col">
+        <div class="staff-label">Árbitro</div>
+        <div class="staff-name">${a.arbitro}</div>
+        ${a.telArbitro?`<div class="staff-tel">${a.telArbitro}</div>`:''}
+      </div>` : ''}
+    </div>` : '';
+
+  const commentHTML = a.comentarios ? `
+    <div class="card-comment">
+      <div class="comment-box">${a.comentarios}</div>
+    </div>` : '';
+
+  return `<div class="activity-card${a.estado==='Cancelado'?' cancelado':''}">
+    <div class="card-top">
+      <div class="card-left">
+        <div class="card-time">${a.horario}</div>
+        <div class="card-division">${a.division}</div>
+        <div class="card-loc">${a.sede} · ${a.cancha}</div>
+      </div>
+      <div class="card-right">
+        <span class="badge ${tipoBadge}">${a.tipo || 'Entreno'}</span>
+        ${showCanchitas ? `<span class="badge b-canch">${a.canchitas} canchitas</span>` : ''}
+        ${estadoClass ? `<span class="badge ${estadoClass}">${a.estado}</span>` : ''}
+      </div>
+    </div>
+    ${matsHTML}${staffHTML}${commentHTML}
+  </div>`;
+}
+
+function renderContent() {
+  const acts = allData
+    .filter(a => a.dia === currentDay)
+    .sort((a,b) => a.horario.localeCompare(b.horario));
+
+  const c = document.getElementById('content');
+  if (!acts.length) {
+    c.innerHTML = `<div class="empty">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
+      <h3>Sin actividad cargada para ${currentDay}</h3>
+    </div>`;
+    return;
+  }
+  c.innerHTML = acts.map(renderCard).join('') +
+    `<div class="last-update">Actualizado: ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}</div>`;
+}
+
+loadData();
+</script>
+</body>
+</html>
